@@ -225,3 +225,68 @@
     (ok "Interest tags successfully refreshed")
   )
 )
+
+;; Administers information visibility controls based on identity validation
+(define-public (manage-profile-visibility
+    (participant-id uint)
+    (account-key principal)
+  )
+  (let ((profile-data (unwrap!
+      (map-get? participant-profile-registry { participant-id: participant-id })
+      ERROR-PARTICIPANT-NOT-FOUND
+    )))
+    ;; Security validation for access authorization
+    (asserts! (is-eq (get account-key profile-data) account-key)
+      ERROR-UNAUTHORIZED-ACTION
+    )
+    (ok true)
+  )
+)
+
+;; Complete profile renovation function for all modifiable attributes
+(define-public (perform-comprehensive-profile-update
+    (participant-id uint)
+    (new-display-name (string-ascii 50))
+    (new-personal-description (string-ascii 160))
+    (new-interest-tags (list 5 (string-ascii 30)))
+  )
+  (let ((profile-data (unwrap!
+      (map-get? participant-profile-registry { participant-id: participant-id })
+      ERROR-PARTICIPANT-NOT-FOUND
+    )))
+    ;; Exhaustive validation for all updateable fields
+    (asserts! (participant-registered? participant-id)
+      ERROR-PARTICIPANT-NOT-FOUND
+    )
+    (asserts! (is-eq (get account-key profile-data) tx-sender)
+      ERROR-UNAUTHORIZED-ACTION
+    )
+    (asserts! (> (len new-display-name) u0) ERROR-INVALID-INPUT)
+    (asserts! (< (len new-display-name) u51) ERROR-INVALID-INPUT)
+    (asserts! (validate-interest-collection new-interest-tags)
+      ERROR-INVALID-INPUT
+    )
+    ;; Apply the comprehensive profile modifications
+    (map-set participant-profile-registry { participant-id: participant-id }
+      (merge profile-data {
+        display-name: new-display-name,
+        personal-description: new-personal-description,
+        interest-tags: new-interest-tags,
+      })
+    )
+    (ok true)
+  )
+)
+
+;; Identity verification for profile ownership assertions
+(define-public (verify-participant-credentials
+    (participant-id uint)
+    (claiming-key principal)
+  )
+  (let ((profile-data (unwrap!
+      (map-get? participant-profile-registry { participant-id: participant-id })
+      ERROR-PARTICIPANT-NOT-FOUND
+    )))
+    (ok (is-eq claiming-key (get account-key profile-data)))
+  )
+)
