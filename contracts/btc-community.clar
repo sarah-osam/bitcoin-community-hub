@@ -128,3 +128,51 @@
     (ok new-participant-id)
   )
 )
+
+;; Records participant engagement event for analytical tracking
+(define-public (log-participant-interaction (participant-id uint))
+  (let ((current-metrics (default-to {
+      last-engagement: u0,
+      engagement-count: u0,
+      recent-interaction: "None",
+    }
+      (map-get? participation-analytics-store { participant-id: participant-id })
+    )))
+    (asserts! (participant-registered? participant-id)
+      ERROR-PARTICIPANT-NOT-FOUND
+    )
+    (map-set participation-analytics-store { participant-id: participant-id } {
+      last-engagement: stacks-block-height,
+      engagement-count: (+ (get engagement-count current-metrics) u1),
+      recent-interaction: "interaction",
+    })
+    (ok true)
+  )
+)
+
+;; Modifies a participant's interest tag selections
+(define-public (update-interest-tags
+    (participant-id uint)
+    (new-interest-tags (list 5 (string-ascii 30)))
+  )
+  (let ((profile-data (unwrap!
+      (map-get? participant-profile-registry { participant-id: participant-id })
+      ERROR-PARTICIPANT-NOT-FOUND
+    )))
+    ;; Verify profile exists and requester has appropriate permissions
+    (asserts! (participant-registered? participant-id)
+      ERROR-PARTICIPANT-NOT-FOUND
+    )
+    (asserts! (is-eq (get account-key profile-data) tx-sender)
+      ERROR-UNAUTHORIZED-ACTION
+    )
+    (asserts! (validate-interest-collection new-interest-tags)
+      ERROR-INVALID-INPUT
+    )
+    ;; Apply the interest tag changes
+    (map-set participant-profile-registry { participant-id: participant-id }
+      (merge profile-data { interest-tags: new-interest-tags })
+    )
+    (ok true)
+  )
+)
