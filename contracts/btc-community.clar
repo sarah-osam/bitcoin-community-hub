@@ -176,3 +176,52 @@
     (ok true)
   )
 )
+
+;; Updates a participant's display identifier
+(define-public (change-display-identifier
+    (participant-id uint)
+    (new-display-name (string-ascii 50))
+  )
+  (let ((profile-data (unwrap!
+      (map-get? participant-profile-registry { participant-id: participant-id })
+      ERROR-PARTICIPANT-NOT-FOUND
+    )))
+    ;; Authentication and validation checks
+    (asserts! (participant-registered? participant-id)
+      ERROR-PARTICIPANT-NOT-FOUND
+    )
+    (asserts! (is-eq (get account-key profile-data) tx-sender)
+      ERROR-UNAUTHORIZED-ACTION
+    )
+    ;; Process the display name modification
+    (map-set participant-profile-registry { participant-id: participant-id }
+      (merge profile-data { display-name: new-display-name })
+    )
+    (ok true)
+  )
+)
+
+;; Advanced System Operations
+
+;; Streamlined pathway for expedited interest tag modifications
+(define-public (express-interest-update
+    (participant-id uint)
+    (new-interest-tags (list 5 (string-ascii 30)))
+  )
+  (begin
+    (asserts! (participant-registered? participant-id)
+      ERROR-PARTICIPANT-NOT-FOUND
+    )
+    (asserts! (validate-interest-collection new-interest-tags)
+      ERROR-INVALID-INPUT
+    )
+    (map-set participant-profile-registry { participant-id: participant-id }
+      (merge
+        (unwrap!
+          (map-get? participant-profile-registry { participant-id: participant-id })
+          ERROR-PARTICIPANT-NOT-FOUND
+        ) { interest-tags: new-interest-tags }
+      ))
+    (ok "Interest tags successfully refreshed")
+  )
+)
