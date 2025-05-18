@@ -55,3 +55,76 @@
   }
   { access-enabled: bool }
 )
+
+;; Utility Functions
+
+;; Confirms participant registration status
+(define-private (participant-registered? (participant-id uint))
+  (is-some (map-get? participant-profile-registry { participant-id: participant-id }))
+)
+
+;; Validates a single interest tag for compliance with system requirements
+(define-private (validate-interest-tag (tag (string-ascii 30)))
+  (and
+    (> (len tag) u0)
+    (< (len tag) u31)
+  )
+)
+
+;; Ensures interest tag collection meets system requirements
+(define-private (validate-interest-collection (tags (list 5 (string-ascii 30))))
+  (and
+    (> (len tags) u0)
+    (<= (len tags) u5)
+    (is-eq (len (filter validate-interest-tag tags)) (len tags))
+  )
+)
+
+;; Verifies participant identity through blockchain credentials
+(define-private (confirm-participant-identity
+    (participant-id uint)
+    (account-key principal)
+  )
+  (match (map-get? participant-profile-registry { participant-id: participant-id })
+    profile (is-eq (get account-key profile) account-key)
+    false
+  )
+)
+
+;; Profile Management Functions
+
+;; Creates new participant profile with comprehensive identity details
+(define-public (register-new-participant
+    (display-name (string-ascii 50))
+    (personal-description (string-ascii 160))
+    (interest-tags (list 5 (string-ascii 30)))
+  )
+  (let ((new-participant-id (+ (var-get collective-membership-count) u1)))
+    ;; Comprehensive validation for all submitted fields
+    (asserts! (and (> (len display-name) u0) (< (len display-name) u51))
+      ERROR-INVALID-INPUT
+    )
+    (asserts!
+      (and (> (len personal-description) u0) (< (len personal-description) u161))
+      ERROR-INVALID-INPUT
+    )
+    (asserts! (validate-interest-collection interest-tags) ERROR-INVALID-INPUT)
+    ;; Create permanent profile record in the registry
+    (map-insert participant-profile-registry { participant-id: new-participant-id } {
+      display-name: display-name,
+      account-key: tx-sender,
+      registration-block: stacks-block-height,
+      personal-description: personal-description,
+      interest-tags: interest-tags,
+    })
+    ;; Initialize default information access settings
+    (map-insert information-access-permissions {
+      participant-id: new-participant-id,
+      observer-key: tx-sender,
+    } { access-enabled: true }
+    )
+    ;; Update collective size tracker
+    (var-set collective-membership-count new-participant-id)
+    (ok new-participant-id)
+  )
+)
